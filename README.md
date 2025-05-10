@@ -1,18 +1,21 @@
-# 📷 grsync
+# :camera: grsync
 
 > Effortlessly download photos from Ricoh GR cameras to your computer.
 
-`grsync` simplifies the process of transferring photos from your Ricoh GR camera to your computer by automating the connection to the camera and the download process
+`grsync` is a cross-platform tool simplifies the process of transferring photos from your Ricoh GR camera to your computer by automating the connection to the camera and the download process
 
-How it works:
+Tested with a Ricoh GR IIIx only, but should work with GR II and GR III models as wel.
+
+## :information_source: How it works
 
 1. Connects to the camera via Bluetooth
 2. Enables the camera integrated Wi-Fi hotspot
-3. Waits for the user to connect to the hotspot
-4. Enumerates photos stored on the camera
-5. Downloads photos to the target directory
+3. Displays the hotspot connection info
+4. Waits for the user to connect to the hotspot
+5. Enumerates photos stored on the camera
+6. Downloads photos to the target directory
 
-## 🚀 Installation
+## :rocket: Installation
 
 ```bash
 # Clone the repository
@@ -23,7 +26,7 @@ cd grsync
 go build
 ```
 
-## 📋 Usage
+## :clipboard: Usage
 
 ```bash
 # Basic usage with required camera name
@@ -36,12 +39,19 @@ go build
 ./grsync --help
 ```
 
-> 💡 The camera name usually starts with "GR_" followed by a unique identifier. Check your camera's Bluetooth settings to find the exact name.
+> :bulb: **Tip**: The camera name usually starts with "GR_" followed by a unique identifier. Check your camera's Bluetooth settings to find the exact name.
 
-## 🤝 Contributing
+## :construction: TODO
+
+* Find a way to automate Wi-Fi hotspot connection
+* Parallelized photos download
+* Allow user to specify which photos extensions should be downloaded
+* Add a flag to list photos without downloading them
+
+## :handshake: Contributing
 
 Contributions are welcome! Feel free to submit issues or pull requests.
 
-## 📜 License
+## :scroll: License
 
 This project is open source and available under the [MIT License](LICENSE).
