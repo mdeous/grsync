@@ -6,10 +6,41 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/mdeous/grsync/api"
 	"github.com/mdeous/grsync/bt"
 )
+
+// parseExtensions takes a comma-separated list of extensions and returns a map of normalized extensions
+func parseExtensions(extensionsInput string) map[string]bool {
+	extensions := make(map[string]bool)
+
+	// Handle special "all" value
+	if strings.ToLower(strings.TrimSpace(extensionsInput)) == "all" {
+		// Include all supported extensions
+		extensions["jpg"] = true
+		extensions["dng"] = true
+		return extensions
+	}
+
+	for _, ext := range strings.Split(extensionsInput, ",") {
+		// Normalize extension to lowercase without the dot
+		ext = strings.ToLower(strings.TrimSpace(ext))
+		if ext == "" {
+			continue
+		}
+		// Remove leading dot if present
+		ext = strings.TrimPrefix(ext, ".")
+
+		// Only allow JPG and DNG extensions
+		if ext == "jpg" || ext == "dng" {
+			extensions[ext] = true
+		}
+	}
+	return extensions
+}
 
 func main() {
 	// Get current directory
@@ -22,13 +53,24 @@ func main() {
 	// Parse command line arguments
 	var cameraName string
 	var photosDestDir string
+	var photoExtensions string
 	flag.StringVar(&cameraName, "camera", "", "Name of the Ricoh camera to connect to (required)")
 	flag.StringVar(&photosDestDir, "dest", currentDir, "Destination directory for downloaded photos")
+	flag.StringVar(&photoExtensions, "ext", "all", "Photo extensions to download (e.g., jpg,dng) or 'all' for all types")
 	flag.Parse()
 
 	// Check if required parameters are provided
 	if cameraName == "" {
 		fmt.Println("[!] Missing required parameter: -camera")
+		fmt.Println("Usage:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Parse photo extensions
+	extensions := parseExtensions(photoExtensions)
+	if len(extensions) == 0 {
+		fmt.Println("[!] No valid photo extensions provided")
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -49,6 +91,17 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("[-]   Connected to camera %s at address %s\n", cameraName, camera.Address.String())
+
+	// Defer disconnection to ensure it happens when the function exits
+	defer func() {
+		fmt.Println("[+] Disconnecting from camera...")
+		if err := camera.Disconnect(); err != nil {
+			fmt.Printf("[!] Failed to disconnect from camera: %v\n", err)
+		} else {
+			fmt.Println("[-]   Bluetooth connection closed")
+		}
+		fmt.Println("[+] All done, you can now disconnect from the camera's Wi-Fi hotspot.")
+	}()
 
 	// Enable camera Wi-Fi hotspot
 	ssid, passphrase, err := bt.EnableWifi(camera)
@@ -83,17 +136,40 @@ func main() {
 		fmt.Printf("[!] Failed to list photos on camera: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("[-] Photo formats to download: %s\n", photoExtensions)
+	downloadCount := 0
+	skippedCount := 0
+	errorCount := 0
+
 	for _, dir := range photos.Dirs {
 		for _, filename := range dir.Files {
+			// Get file extension and normalize it
+			ext := strings.ToLower(filepath.Ext(filename))
+			ext = strings.TrimPrefix(ext, ".")
+
+			// Skip files with extensions not in our filter
+			if !extensions[ext] {
+				skippedCount++
+				continue
+			}
+
 			photoPath := "/" + path.Join(dir.Name, filename)
 			fmt.Printf("[-]   - %s... ", photoPath)
 			destPath, err := api.DownloadPhoto(photoPath, photosDestDir)
 			if err != nil {
 				fmt.Printf("ERROR (%s)\n", err.Error())
+				errorCount++
 				continue
 			}
 			fmt.Println("OK")
 			fmt.Printf("[-]   --> %s\n", destPath)
+			downloadCount++
 		}
 	}
+
+	fmt.Println("[+] Download complete")
+	fmt.Printf("[-]   Downloaded: %d\n", downloadCount)
+	fmt.Printf("[-]   Skipped: %d\n", skippedCount)
+	fmt.Printf("[-]   Errors: %d\n", errorCount)
 }

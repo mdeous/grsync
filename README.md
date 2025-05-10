@@ -35,6 +35,18 @@ go build
 # Specify a custom download destination (defaults to current directory)
 ./grsync --camera="GR_XXXXXX" --dest="~/Pictures/Ricoh"
 
+# Download only JPG files
+./grsync --camera="GR_XXXXXX" --ext="jpg"
+
+# Download only DNG files
+./grsync --camera="GR_XXXXXX" --ext="dng"
+
+# Download both JPG and DNG files 
+./grsync --camera="GR_XXXXXX" --ext="jpg,dng"
+
+# Download all supported photo types (default behavior)
+./grsync --camera="GR_XXXXXX" --ext="all"
+
 # Show help
 ./grsync --help
 ```
@@ -45,7 +57,6 @@ go build
 
 * Find a way to automate Wi-Fi hotspot connection
 * Parallelized photos download
-* Allow user to specify which photos extensions should be downloaded
 * Add a flag to list photos without downloading them
 
 ## :handshake: Contributing
