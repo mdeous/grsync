@@ -4,6 +4,7 @@ type Properties struct {
 	Model           string `json:"model"`
 	FirmwareVersion string `json:"firmwareVersion"`
 	Battery         int    `json:"battery"`
+	SerialNumber    string `json:"serialNo"`
 }
 
 type PhotosDir struct {

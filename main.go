@@ -66,7 +66,7 @@ func main() {
 	scanner.Scan()
 
 	// Get device information
-	fmt.Println("[+] Requesting device information...")
+	fmt.Println("[+] Fetching device information...")
 	props, err := api.GetDeviceInfo()
 	if err != nil {
 		fmt.Printf("[!] Failed to get device information: %v\n", err)
@@ -74,6 +74,7 @@ func main() {
 	}
 	fmt.Printf("[-]   Model: %s\n", props.Model)
 	fmt.Printf("[-]   Firmware version: %s\n", props.FirmwareVersion)
+	fmt.Printf("[-]   Serial number: %s\n", props.SerialNumber)
 	fmt.Printf("[-]   Battery: %d%%\n", props.Battery)
 
 	fmt.Println("[+] Downloading photos...")
