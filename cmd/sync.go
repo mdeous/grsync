@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/mdeous/grsync/api"
-	"github.com/mdeous/grsync/bt"
 	"github.com/spf13/cobra"
 )
 
@@ -81,42 +80,17 @@ var syncCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Enable Bluetooth adapter
-		err = bt.Adapter.Enable()
-		if err != nil {
-			fmt.Printf("[!] Failed to enable Bluetooth device: %v\n", err)
-			os.Exit(1)
+		// Establish camera session (BT connection and Wi-Fi)
+		camera, err := establishCameraSession(cameraName)
+		// Defer disconnection to ensure it happens when the function exits, only if camera object is valid
+		if camera != nil {
+			defer cameraDisconnect(camera)
 		}
 
-		// Find Ricoh camera and connect
-		fmt.Printf("[+] Scanning for Ricoh camera %s...\n", cameraName)
-		camera, err := bt.FindCamera(cameraName)
 		if err != nil {
-			fmt.Printf("[!] Failed to find camera: %v\n", err)
+			fmt.Printf("[!] Failed to establish camera session: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("[-]   Connected to camera %s at address %s\n", cameraName, camera.Address.String())
-
-		// Defer disconnection to ensure it happens when the function exits
-		defer func() {
-			fmt.Println("[+] Disconnecting from camera...")
-			if err := camera.Disconnect(); err != nil {
-				fmt.Printf("[!] Failed to disconnect from camera: %v\n", err)
-			} else {
-				fmt.Println("[-]   Bluetooth connection closed")
-			}
-			fmt.Println("[+] All done, you can now disconnect from the camera's Wi-Fi hotspot.")
-		}()
-
-		// Enable camera Wi-Fi hotspot
-		ssid, passphrase, err := bt.EnableWifi(camera)
-		if err != nil {
-			fmt.Printf("[!] Failed to enable Wi-Fi: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("[+] Wi-Fi hotspot information:")
-		fmt.Printf("[-]   SSID: %s\n", ssid)
-		fmt.Printf("[-]   Passphrase: %s\n", passphrase)
 
 		// Wait for user to connect to Wi-Fi hotspot
 		scanner := bufio.NewScanner(os.Stdin)
