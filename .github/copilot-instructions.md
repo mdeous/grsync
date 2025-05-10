@@ -7,3 +7,4 @@
 * When making changes, always consider the impact on existing code and ensure that the changes are well integrated into the existing codebase and that all required modifications are made to make them work;
 * When making changes that supersede existing code, be careful to not leave any remnants of the old code that could cause confusion or errors;
 * When introducing a new dependency, ensure that it is necessary and that the library is well maintained, if no sufficiently well maintained library is available, offer the user different options and let them decide what to do;
+* When using a library, always follow the library's documentation and best practices, be creative only if it's strictly required;
