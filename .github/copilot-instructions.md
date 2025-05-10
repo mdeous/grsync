@@ -8,3 +8,4 @@
 * When making changes that supersede existing code, be careful to not leave any remnants of the old code that could cause confusion or errors;
 * When introducing a new dependency, ensure that it is necessary and that the library is well maintained, if no sufficiently well maintained library is available, offer the user different options and let them decide what to do;
 * When using a library, always follow the library's documentation and best practices, be creative only if it's strictly required;
+* Only add comments when it's useful and helps understanding what a code snippet does, never add comments about past changes (e.g. "moved x to y", "removed z", etc.);
