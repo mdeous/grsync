@@ -10,12 +10,28 @@ import (
 const scanMaxTime = 30 * time.Second
 const wifiStartupTime = 2 * time.Second
 
+type WifiState int
+
+const (
+	WifiDisabled WifiState = iota
+	WifiEnabled
+	WifiUnknown
+)
+
+// String returns a string representation of the WifiState.
+func (s WifiState) String() string {
+	switch s {
+	case WifiDisabled:
+		return "disabled"
+	case WifiEnabled:
+		return "enabled"
+	default:
+		return "unknown"
+	}
+}
+
 var Adapter = bluetooth.DefaultAdapter
 var CameraAddress bluetooth.Address
-var WifiStatus = []string{
-	"disabled",
-	"enabled",
-}
 
 var (
 	wlanServiceUUID, _        = bluetooth.ParseUUID("F37F568F-9071-445D-A938-5441F2E82399")
@@ -86,17 +102,17 @@ func readCharacteristic(svc *bluetooth.DeviceService, charUUID bluetooth.UUID) (
 	return &chr, buffer[:dataLen], nil
 }
 
-func getWifiStatus(svc *bluetooth.DeviceService) (*bluetooth.DeviceCharacteristic, int, error) {
+func getWifiStatus(svc *bluetooth.DeviceService) (*bluetooth.DeviceCharacteristic, WifiState, error) {
 	chr, wlanStatus_bytes, err := readCharacteristic(svc, wlanNetworkCharUUID)
 	if err != nil {
-		return nil, 0, err
+		return nil, WifiUnknown, err
 	}
 	wlanStatusLen := len(wlanStatus_bytes)
 	if wlanStatusLen != 1 {
-		return nil, 0, fmt.Errorf("unexpected Wi-Fi status length: %d", wlanStatusLen)
+		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", wlanStatusLen)
 	}
-	wlanStatusValue := int(wlanStatus_bytes[0])
-	fmt.Printf("[+] Wi-Fi hotspot status: %s\n", WifiStatus[wlanStatusValue])
+	wlanStatusValue := WifiState(wlanStatus_bytes[0])
+	fmt.Printf("[+] Wi-Fi hotspot status: %s\n", wlanStatusValue)
 	return chr, wlanStatusValue, nil
 }
 
@@ -148,16 +164,22 @@ func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err e
 	if err != nil {
 		return "", "", err
 	}
-	if wlanStatusValue == 0 {
+	if wlanStatusValue == WifiDisabled {
 		fmt.Println("[+] Enabling Wi-Fi hotspot...")
 		// Enable Wi-Fi hotspot
-		wlanStatus_bytes := []byte{1}
-		chr.WriteWithoutResponse(wlanStatus_bytes)
+		wlanStatus_bytes := []byte{byte(WifiEnabled)}
+		_, err = chr.WriteWithoutResponse(wlanStatus_bytes)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to write Wi-Fi status: %w", err)
+		}
 		time.Sleep(wifiStartupTime)
 		// Check if Wi-Fi was successfully enabled
-		_, _, err = getWifiStatus(svc)
+		_, newStatus, err := getWifiStatus(svc)
 		if err != nil {
 			return "", "", err
+		}
+		if newStatus != WifiEnabled {
+			return "", "", fmt.Errorf("failed to enable Wi-Fi hotspot, current status: %s", newStatus)
 		}
 	}
 
