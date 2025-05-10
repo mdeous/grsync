@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path"
@@ -13,7 +12,6 @@ import (
 )
 
 var (
-	cameraName      string
 	photosDestDir   string
 	photoExtensions string
 )
@@ -82,7 +80,6 @@ var syncCmd = &cobra.Command{
 
 		// Establish camera session (BT connection and Wi-Fi)
 		camera, err := establishCameraSession(cameraName)
-		// Defer disconnection to ensure it happens when the function exits, only if camera object is valid
 		if camera != nil {
 			defer cameraDisconnect(camera)
 		}
@@ -92,12 +89,8 @@ var syncCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Wait for user to connect to Wi-Fi hotspot
-		scanner := bufio.NewScanner(os.Stdin)
-		fmt.Print("[>] Press Enter to continue after connecting to the Wi-Fi hotspot...")
-		scanner.Scan()
+		waitForWifiConnection()
 
-		// Get device information
 		fmt.Println("[+] Fetching device information...")
 		props, err := api.GetDeviceInfo()
 		if err != nil {
@@ -107,61 +100,57 @@ var syncCmd = &cobra.Command{
 		fmt.Printf("[-]   Model: %s\n", props.Model)
 		fmt.Printf("[-]   Firmware version: %s\n", props.FirmwareVersion)
 		fmt.Printf("[-]   Serial number: %s\n", props.SerialNumber)
-		fmt.Printf("[-]   Battery: %d%%\n", props.Battery)
+		fmt.Printf("[-]   Battery level: %d%%\n", props.Battery)
 
-		fmt.Println("[+] Downloading photos...")
+		fmt.Println("[+] Fetching photo list...")
 		photos, err := api.GetPhotos()
 		if err != nil {
 			fmt.Printf("[!] Failed to list photos on camera: %v\n", err)
 			os.Exit(1)
 		}
 
-		extDisplay := []string{}
-		for ext := range extensions {
-			extDisplay = append(extDisplay, ext)
+		// Check if any photos were found
+		if len(photos.Dirs) == 0 {
+			fmt.Println("[-] No photos found on the camera.")
+			return
 		}
-		fmt.Printf("[-] Photo formats to download: %s\n", strings.Join(extDisplay, ", "))
-		downloadCount := 0
-		skippedCount := 0
-		errorCount := 0
 
+		downloadCount := 0
+		fmt.Println("[+] Downloading photos...")
 		for _, dir := range photos.Dirs {
 			for _, filename := range dir.Files {
-				// Get file extension and normalize it
-				ext := strings.ToLower(filepath.Ext(filename))
-				ext = strings.TrimPrefix(ext, ".")
-
-				// Skip files with extensions not in our filter
-				if !extensions[ext] {
-					skippedCount++
+				photoPath := path.Join(dir.Name, filename)
+				// Check if the file extension is desired
+				fileExt := strings.ToLower(strings.TrimPrefix(filepath.Ext(filename), "."))
+				if !extensions[fileExt] {
 					continue
 				}
 
-				photoPath := "/" + path.Join(dir.Name, filename)
-				fmt.Printf("[-]   - %s... ", photoPath)
+				fmt.Printf("[-]   Downloading %s...\n", photoPath)
 				destPath, err := api.DownloadPhoto(photoPath, photosDestDir)
 				if err != nil {
-					fmt.Printf("ERROR (%s)\n", err.Error())
-					errorCount++
-					continue
+					if os.IsExist(err) {
+						fmt.Printf("[-]     Skipping, file already exists: %s\n", destPath)
+					} else {
+						fmt.Printf("[!]     Failed to download %s: %v\n", photoPath, err)
+					}
+				} else {
+					fmt.Printf("[-]     Saved to %s\n", destPath)
+					downloadCount++
 				}
-				fmt.Println("OK")
-				fmt.Printf("[-]   --> %s\n", destPath)
-				downloadCount++
 			}
 		}
 
-		fmt.Println("[+] Download complete")
-		fmt.Printf("[-]   Downloaded: %d\n", downloadCount)
-		fmt.Printf("[-]   Skipped: %d\n", skippedCount)
-		fmt.Printf("[-]   Errors: %d\n", errorCount)
+		if downloadCount > 0 {
+			fmt.Printf("[+] Successfully downloaded %d photo(s) to %s\n", downloadCount, photosDestDir)
+		} else {
+			fmt.Println("[-] No new photos to download.")
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(syncCmd)
-	syncCmd.Flags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to (required)")
-	syncCmd.MarkFlagRequired("camera")
-	syncCmd.Flags().StringVarP(&photosDestDir, "dest", "d", ".", "Destination directory for downloaded photos (defaults to current directory)")
-	syncCmd.Flags().StringVarP(&photoExtensions, "ext", "e", "all", "Photo extensions to download (e.g., jpg,dng) or 'all' for all types")
+	syncCmd.Flags().StringVarP(&photosDestDir, "dest", "d", ".", "Destination directory for photos")
+	syncCmd.Flags().StringVarP(&photoExtensions, "extensions", "e", "all", "Comma-separated list of photo extensions to download (jpg, dng, all)")
 }

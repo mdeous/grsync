@@ -18,11 +18,11 @@ const (
 func readURI(uri string) ([]byte, error) {
 	resp, err := http.Get(host + uri)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to camera API: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to read URI %s: %v", uri, resp.Status)
+		return nil, fmt.Errorf("failed to read URI %s: status %s", uri, resp.Status)
 	}
 	return io.ReadAll(resp.Body)
 }
@@ -30,11 +30,11 @@ func readURI(uri string) ([]byte, error) {
 func GetDeviceInfo() (props *Properties, err error) {
 	data, err := readURI(propertiesPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read device properties: %w", err)
 	}
 	err = json.Unmarshal(data, &props)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse device properties: %w", err)
 	}
 
 	return props, nil
@@ -43,43 +43,39 @@ func GetDeviceInfo() (props *Properties, err error) {
 func GetPhotos() (Photos, error) {
 	data, err := readURI(photosPath)
 	if err != nil {
-		return Photos{}, err
+		return Photos{}, fmt.Errorf("failed to read photos list: %w", err)
 	}
 	var photos Photos
 	err = json.Unmarshal(data, &photos)
 	if err != nil {
-		return Photos{}, err
+		return Photos{}, fmt.Errorf("failed to parse photos list: %w", err)
 	}
 	return photos, nil
 }
 
 func DownloadPhoto(photoPath string, destDir string) (destPath string, err error) {
-	// Determine destination file and folder
 	destPath = path.Join(destDir, photoPath)
 	destPhotoDir := path.Dir(destPath)
 
-	// Check if destination file already exists
-	if _, err := os.Stat(destPath); os.IsExist((err)) {
+	if _, err := os.Stat(destPath); err == nil {
 		return "", fmt.Errorf("file already exists: %s", destPath)
 	}
 
-	// Check if destination folder exists
 	if _, err := os.Stat(destPhotoDir); os.IsNotExist(err) {
 		err = os.MkdirAll(destPhotoDir, 0755)
 		if err != nil {
-			return "", fmt.Errorf("failed to create destination folder: %v", err)
+			return "", fmt.Errorf("failed to create destination folder: %w", err)
 		}
 	}
 
-	// Download photo
-	photoUri := photosPath + photoPath
+	photoUri := photosPath + "/" + photoPath
 	photoData, err := readURI(photoUri)
 	if err != nil {
-		return "", fmt.Errorf("failed to download photo %s: %v", photoPath, err)
+		return "", fmt.Errorf("failed to download photo %s: %w", photoPath, err)
 	}
 	err = os.WriteFile(destPath, photoData, 0750)
 	if err != nil {
-		return "", fmt.Errorf("failed to write photo file: %v", err)
+		return "", fmt.Errorf("failed to write photo file: %w", err)
 	}
 	return destPath, nil
 }

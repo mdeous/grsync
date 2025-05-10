@@ -7,8 +7,11 @@ import (
 	"tinygo.org/x/bluetooth"
 )
 
-const scanMaxTime = 30 * time.Second
-const wifiStartupTime = 2 * time.Second
+const (
+	scanMaxTime     = 30 * time.Second
+	wifiStartupTime = 2 * time.Second
+	rxBuffSize      = 64
+)
 
 type WifiState int
 
@@ -30,19 +33,20 @@ func (s WifiState) String() string {
 	}
 }
 
-var Adapter = bluetooth.DefaultAdapter
-var CameraAddress bluetooth.Address
+var (
+	Adapter       = bluetooth.DefaultAdapter
+	CameraAddress bluetooth.Address
+	cameraFound   = false
+	scanDone      = make(chan struct{})
+)
 
+// Bluetooth UUIDs for WLAN service
 var (
 	wlanServiceUUID, _        = bluetooth.ParseUUID("F37F568F-9071-445D-A938-5441F2E82399")
 	wlanNetworkCharUUID, _    = bluetooth.ParseUUID("9111CDD0-9F01-45C4-A2D4-E09E8FB0424D")
 	wlanSSIDCharUUID, _       = bluetooth.ParseUUID("90638E5A-E77D-409D-B550-78F7E1CA5AB4")
 	wlanPassphraseCharUUID, _ = bluetooth.ParseUUID("0F38279C-FE9E-461B-8596-81287E8C9A81")
 )
-
-var cameraFound = false
-var scanDone = make(chan struct{})
-var rxBuffSize = 64
 
 func stopScan(cameraFound bool) {
 	close(scanDone)
@@ -76,8 +80,11 @@ func scanCallback(deviceName string) func(adapter *bluetooth.Adapter, device blu
 func getService(device *bluetooth.Device, svcUUID bluetooth.UUID) (*bluetooth.DeviceService, error) {
 	// Discover the requested service
 	services, err := device.DiscoverServices([]bluetooth.UUID{svcUUID})
-	if err != nil || len(services) != 1 {
-		return nil, fmt.Errorf("failed to discover %s service: %v", svcUUID.String(), err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover %s service: %w", svcUUID.String(), err)
+	}
+	if len(services) != 1 {
+		return nil, fmt.Errorf("unexpected number of services found: %d", len(services))
 	}
 	svc := services[0]
 	return &svc, nil
@@ -86,8 +93,11 @@ func getService(device *bluetooth.Device, svcUUID bluetooth.UUID) (*bluetooth.De
 func readCharacteristic(svc *bluetooth.DeviceService, charUUID bluetooth.UUID) (*bluetooth.DeviceCharacteristic, []byte, error) {
 	// Discover the requested characteristic
 	characteristic, err := svc.DiscoverCharacteristics([]bluetooth.UUID{charUUID})
-	if err != nil || len(characteristic) != 1 {
-		return nil, nil, fmt.Errorf("failed to discover %s characteristic: %v", charUUID.String(), err)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to discover %s characteristic: %w", charUUID.String(), err)
+	}
+	if len(characteristic) != 1 {
+		return nil, nil, fmt.Errorf("unexpected number of characteristics found: %d", len(characteristic))
 	}
 	chr := characteristic[0]
 
@@ -95,7 +105,7 @@ func readCharacteristic(svc *bluetooth.DeviceService, charUUID bluetooth.UUID) (
 	buffer := make([]byte, rxBuffSize)
 	dataLen, err := chr.Read(buffer)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read characteristic %s data: %v", charUUID.String(), err)
+		return nil, nil, fmt.Errorf("failed to read characteristic %s data: %w", charUUID.String(), err)
 	}
 
 	// Return the relevant portion of the buffer
@@ -103,17 +113,17 @@ func readCharacteristic(svc *bluetooth.DeviceService, charUUID bluetooth.UUID) (
 }
 
 func getWifiStatus(svc *bluetooth.DeviceService) (*bluetooth.DeviceCharacteristic, WifiState, error) {
-	chr, wlanStatus_bytes, err := readCharacteristic(svc, wlanNetworkCharUUID)
+	chr, statusBytes, err := readCharacteristic(svc, wlanNetworkCharUUID)
 	if err != nil {
 		return nil, WifiUnknown, err
 	}
-	wlanStatusLen := len(wlanStatus_bytes)
-	if wlanStatusLen != 1 {
-		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", wlanStatusLen)
+	statusLen := len(statusBytes)
+	if statusLen != 1 {
+		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", statusLen)
 	}
-	wlanStatusValue := WifiState(wlanStatus_bytes[0])
-	fmt.Printf("[+] Wi-Fi hotspot status: %s\n", wlanStatusValue)
-	return chr, wlanStatusValue, nil
+	statusValue := WifiState(statusBytes[0])
+	fmt.Printf("[+] Wi-Fi hotspot status: %s\n", statusValue)
+	return chr, statusValue, nil
 }
 
 func FindCamera(name string) (*bluetooth.Device, error) {
@@ -132,7 +142,7 @@ func FindCamera(name string) (*bluetooth.Device, error) {
 	// Start scanning for devices
 	cb := scanCallback(name)
 	if err := Adapter.Scan(cb); err != nil {
-		return nil, fmt.Errorf("failed to start Bluetooth scan: %v", err)
+		return nil, fmt.Errorf("failed to start Bluetooth scan: %w", err)
 	}
 	// Wait for scan to finish
 	<-scanDone
@@ -146,7 +156,7 @@ func FindCamera(name string) (*bluetooth.Device, error) {
 		// NOTE: for some reason the 1st connection sometimes fails and requires a retry
 		cameraDevice, err = Adapter.Connect(CameraAddress, bluetooth.ConnectionParams{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to camera %s: %v", name, err)
+			return nil, fmt.Errorf("failed to connect to camera %s: %w", name, err)
 		}
 	}
 	return &cameraDevice, nil
@@ -167,8 +177,8 @@ func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err e
 	if wlanStatusValue == WifiDisabled {
 		fmt.Println("[+] Enabling Wi-Fi hotspot...")
 		// Enable Wi-Fi hotspot
-		wlanStatus_bytes := []byte{byte(WifiEnabled)}
-		_, err = chr.WriteWithoutResponse(wlanStatus_bytes)
+		statusBytes := []byte{byte(WifiEnabled)}
+		_, err = chr.WriteWithoutResponse(statusBytes)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to write Wi-Fi status: %w", err)
 		}
@@ -184,18 +194,18 @@ func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err e
 	}
 
 	// Get Wi-Fi SSID
-	_, ssid_b, err := readCharacteristic(svc, wlanSSIDCharUUID)
+	_, ssidBytes, err := readCharacteristic(svc, wlanSSIDCharUUID)
 	if err != nil {
 		return "", "", err
 	}
-	ssid = string(ssid_b)
+	ssid = string(ssidBytes)
 
 	// Get Wi-Fi passphrase
-	_, passphrase_b, err := readCharacteristic(svc, wlanPassphraseCharUUID)
+	_, passphraseBytes, err := readCharacteristic(svc, wlanPassphraseCharUUID)
 	if err != nil {
 		return "", "", err
 	}
-	passphrase = string(passphrase_b)
+	passphrase = string(passphraseBytes)
 
 	return
 }

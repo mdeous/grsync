@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 
 	"github.com/mdeous/grsync/bt"
 	"tinygo.org/x/bluetooth"
@@ -47,4 +49,11 @@ func cameraDisconnect(camera *bluetooth.Device) {
 		fmt.Println("[-]   Bluetooth connection closed")
 	}
 	fmt.Println("[+] All done, you can now disconnect from the camera's Wi-Fi hotspot.")
+}
+
+// waitForWifiConnection prompts the user to connect to the Wi-Fi and waits for an Enter key press.
+func waitForWifiConnection() {
+	fmt.Print("[>] Press Enter to continue after connecting to the Wi-Fi hotspot...")
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var cameraName string
+
 var rootCmd = &cobra.Command{
 	Use:   "grsync",
 	Short: "grsync is a tool to synchronize files from a Ricoh camera.",
@@ -17,6 +19,11 @@ var rootCmd = &cobra.Command{
 			return
 		}
 	},
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to")
+	rootCmd.MarkPersistentFlagRequired("camera")
 }
 
 // Execute executes the root command.
