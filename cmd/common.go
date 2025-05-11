@@ -54,7 +54,7 @@ func cameraDisconnect(camera *bluetooth.Device) {
 
 // waitForWifiConnection prompts the user to connect to the Wi-Fi and waits for an Enter key press.
 func waitForWifiConnection() {
-	fmt.Print("[>] Press Enter to continue after connecting to the Wi-Fi hotspot...")
+	fmt.Printf("%s[>] Press Enter to continue after connecting to the Wi-Fi hotspot...%s", logger.ColorBoldCyan, logger.ColorReset)
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 }
