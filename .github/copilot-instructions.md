@@ -10,3 +10,4 @@
 * When using a library, always follow the library's documentation and best practices, be creative only if it's strictly required;
 * Only add comments when it's necessary to understand what the code does, if the code is self-explanatory, no comments are needed;
 * Never add comments about changes you made (e.g. "moved x to y", "removed z", etc.);
+* Avoid unnecessary complexity in the code, considering equal end result, prefer the simplest solution;
