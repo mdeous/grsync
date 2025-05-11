@@ -9,7 +9,7 @@ var cameraName string
 
 var rootCmd = &cobra.Command{
 	Use:   "grsync",
-	Short: "grsync is a tool to synchronize files from a Ricoh camera.",
+	Short: "Synchronize photos from a Ricoh camera.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is given, print help
 		if len(args) == 0 {
