@@ -57,7 +57,6 @@ go build
 
 * Find a way to automate Wi-Fi hotspot connection
 * Parallelized photos download
-* Add a flag to list photos without downloading them
 
 ## :handshake: Contributing
 
