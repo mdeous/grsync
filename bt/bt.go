@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mdeous/grsync/internal/logger"
 	"tinygo.org/x/bluetooth"
 )
 
@@ -51,12 +52,12 @@ var (
 func stopScan(cameraFound bool) {
 	close(scanDone)
 	if !cameraFound {
-		fmt.Printf("[!] Bluetooth scan timed out after %s, stopping scan\n", scanMaxTime)
+		logger.Warn("Bluetooth scan timed out after %s, stopping scan", scanMaxTime)
 	}
 	if err := Adapter.StopScan(); err != nil {
-		fmt.Printf("[!] Failed to stop Bluetooth scan: %v\n", err)
+		logger.Warn("Failed to stop Bluetooth scan: %v", err)
 	}
-	fmt.Println("[-]   Stopped scanning")
+	logger.SubDetail(1, "Stopped scanning")
 }
 
 func scanCallback(deviceName string) func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
@@ -69,7 +70,7 @@ func scanCallback(deviceName string) func(adapter *bluetooth.Adapter, device blu
 		devAddr := device.Address.String()
 		if device.AdvertisementPayload.HasServiceUUID(wlanServiceUUID) && device.LocalName() == deviceName {
 			cameraFound = true
-			fmt.Printf("[-] Found Ricoh camera %s with address %s (RSSI: %d)\n", deviceName, devAddr, device.RSSI)
+			logger.Detail("Found Ricoh camera %s with address %s (RSSI: %d)", deviceName, devAddr, device.RSSI)
 			CameraAddress = device.Address
 			// Camera found, no need to continue scanning
 			stopScan(true)
@@ -122,7 +123,7 @@ func getWifiStatus(svc *bluetooth.DeviceService) (*bluetooth.DeviceCharacteristi
 		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", statusLen)
 	}
 	statusValue := WifiState(statusBytes[0])
-	fmt.Printf("[+] Wi-Fi hotspot status: %s\n", statusValue)
+	logger.Info("Wi-Fi hotspot status: %s", statusValue)
 	return chr, statusValue, nil
 }
 
@@ -150,7 +151,7 @@ func FindCamera(name string) (*bluetooth.Device, error) {
 		return nil, fmt.Errorf("%s not found", name)
 	}
 	// Connect to the camera
-	fmt.Println("[+] Connecting to camera...")
+	logger.Info("Connecting to camera...")
 	cameraDevice, err := Adapter.Connect(CameraAddress, bluetooth.ConnectionParams{})
 	if err != nil {
 		// NOTE: for some reason the 1st connection sometimes fails and requires a retry
@@ -175,7 +176,7 @@ func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err e
 		return "", "", err
 	}
 	if wlanStatusValue == WifiDisabled {
-		fmt.Println("[+] Enabling Wi-Fi hotspot...")
+		logger.Info("Enabling Wi-Fi hotspot...")
 		// Enable Wi-Fi hotspot
 		statusBytes := []byte{byte(WifiEnabled)}
 		_, err = chr.WriteWithoutResponse(statusBytes)
