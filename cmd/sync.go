@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/mdeous/grsync/api"
+	"github.com/mdeous/grsync/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -54,26 +54,23 @@ var syncCmd = &cobra.Command{
 		var err error
 		photosDestDir, err = filepath.Abs(photosDestDir)
 		if err != nil {
-			fmt.Printf("[!] Failed to resolve destination directory path '%s': %v\n", photosDestDir, err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to resolve destination directory path '%s'", photosDestDir)
 		}
 
 		// Ensure the destination directory exists, create if not.
 		if _, err := os.Stat(photosDestDir); os.IsNotExist(err) {
-			fmt.Printf("[+] Destination directory '%s' does not exist, creating it.\n", photosDestDir)
+			logger.Info("Destination directory '%s' does not exist, creating it.", photosDestDir)
 			if err := os.MkdirAll(photosDestDir, 0755); err != nil {
-				fmt.Printf("[!] Failed to create destination directory '%s': %v\n", photosDestDir, err)
-				os.Exit(1)
+				logger.Fatal(err, "Failed to create destination directory '%s'", photosDestDir)
 			}
 		} else if err != nil {
-			fmt.Printf("[!] Error checking destination directory '%s': %v\n", photosDestDir, err)
-			os.Exit(1)
+			logger.Fatal(err, "Error checking destination directory '%s'", photosDestDir)
 		}
 
 		// Parse photo extensions
 		extensions := parseExtensions(photoExtensions)
 		if len(extensions) == 0 {
-			fmt.Println("[!] No valid photo extensions provided. Use 'jpg', 'dng', or 'all'.")
+			logger.Error(nil, "No valid photo extensions provided. Use 'jpg', 'dng', or 'all'.")
 			cmd.Help()
 			os.Exit(1)
 		}
@@ -85,38 +82,35 @@ var syncCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			fmt.Printf("[!] Failed to establish camera session: %v\n", err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to establish camera session")
 		}
 
 		waitForWifiConnection()
 
-		fmt.Println("[+] Fetching device information...")
+		logger.Info("Fetching device information...")
 		props, err := api.GetDeviceInfo()
 		if err != nil {
-			fmt.Printf("[!] Failed to get device information: %v\n", err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to get device information")
 		}
-		fmt.Printf("[-]   Model: %s\n", props.Model)
-		fmt.Printf("[-]   Firmware version: %s\n", props.FirmwareVersion)
-		fmt.Printf("[-]   Serial number: %s\n", props.SerialNumber)
-		fmt.Printf("[-]   Battery level: %d%%\n", props.Battery)
+		logger.SubDetail(1, "Model: %s", props.Model)
+		logger.SubDetail(1, "Firmware version: %s", props.FirmwareVersion)
+		logger.SubDetail(1, "Serial number: %s", props.SerialNumber)
+		logger.SubDetail(1, "Battery level: %d%%", props.Battery)
 
-		fmt.Println("[+] Fetching photo list...")
+		logger.Info("Fetching photo list...")
 		photos, err := api.GetPhotos()
 		if err != nil {
-			fmt.Printf("[!] Failed to list photos on camera: %v\n", err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to list photos on camera")
 		}
 
 		// Check if any photos were found
 		if len(photos.Dirs) == 0 {
-			fmt.Println("[-] No photos found on the camera.")
+			logger.Detail("No photos found on the camera.")
 			return
 		}
 
 		downloadCount := 0
-		fmt.Println("[+] Downloading photos...")
+		logger.Info("Downloading photos...")
 		for _, dir := range photos.Dirs {
 			for _, filename := range dir.Files {
 				photoPath := path.Join(dir.Name, filename)
@@ -126,25 +120,25 @@ var syncCmd = &cobra.Command{
 					continue
 				}
 
-				fmt.Printf("[-]   Downloading %s...\n", photoPath)
+				logger.SubDetail(1, "Downloading %s...", photoPath)
 				destPath, err := api.DownloadPhoto(photoPath, photosDestDir)
 				if err != nil {
 					if os.IsExist(err) {
-						fmt.Printf("[-]     Skipping, file already exists: %s\n", destPath)
+						logger.SubDetail(2, "Skipping, file already exists: %s", destPath)
 					} else {
-						fmt.Printf("[!]     Failed to download %s: %v\n", photoPath, err)
+						logger.SubWarn(2, "Failed to download %s: %v", photoPath, err)
 					}
 				} else {
-					fmt.Printf("[-]     Saved to %s\n", destPath)
+					logger.SubDetail(2, "Saved to %s", destPath)
 					downloadCount++
 				}
 			}
 		}
 
 		if downloadCount > 0 {
-			fmt.Printf("[+] Successfully downloaded %d photo(s) to %s\n", downloadCount, photosDestDir)
+			logger.Info("Successfully downloaded %d photo(s) to %s", downloadCount, photosDestDir)
 		} else {
-			fmt.Println("[-] No new photos to download.")
+			logger.Detail("No new photos to download.")
 		}
 	},
 }

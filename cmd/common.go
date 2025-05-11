@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/mdeous/grsync/bt"
+	"github.com/mdeous/grsync/internal/logger"
 	"tinygo.org/x/bluetooth"
 )
 
@@ -19,21 +20,21 @@ func establishCameraSession(cameraNameVal string) (camera *bluetooth.Device, err
 	}
 
 	// Find Ricoh camera and connect
-	fmt.Printf("[+] Scanning for Ricoh camera %s...\n", cameraNameVal)
+	logger.Info("Scanning for Ricoh camera %s...", cameraNameVal)
 	camera, err = bt.FindCamera(cameraNameVal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find camera %s: %w", cameraNameVal, err)
 	}
-	fmt.Printf("[-]   Connected to camera %s at address %s\n", cameraNameVal, camera.Address.String())
+	logger.SubDetail(1, "Connected to camera %s at address %s", cameraNameVal, camera.Address.String())
 
 	// Enable camera Wi-Fi hotspot
 	ssid, passphrase, err := bt.EnableWifi(camera)
 	if err != nil {
 		return camera, fmt.Errorf("failed to enable Wi-Fi: %w", err)
 	}
-	fmt.Println("[+] Wi-Fi hotspot information:")
-	fmt.Printf("[-]   SSID: %s\n", ssid)
-	fmt.Printf("[-]   Passphrase: %s\n", passphrase)
+	logger.Info("Wi-Fi hotspot information:")
+	logger.SubDetail(1, "SSID: %s", ssid)
+	logger.SubDetail(1, "Passphrase: %s", passphrase)
 	return camera, nil
 }
 
@@ -42,13 +43,13 @@ func cameraDisconnect(camera *bluetooth.Device) {
 	if camera == nil {
 		return
 	}
-	fmt.Println("[+] Disconnecting from camera...")
+	logger.Info("Disconnecting from camera...")
 	if err := camera.Disconnect(); err != nil {
-		fmt.Printf("[!] Failed to disconnect from camera: %v\n", err)
+		logger.Warn("Failed to disconnect from camera: %v", err)
 	} else {
-		fmt.Println("[-]   Bluetooth connection closed")
+		logger.SubDetail(1, "Bluetooth connection closed")
 	}
-	fmt.Println("[+] All done, you can now disconnect from the camera's Wi-Fi hotspot.")
+	logger.Info("All done, you can now disconnect from the camera's Wi-Fi hotspot.")
 }
 
 // waitForWifiConnection prompts the user to connect to the Wi-Fi and waits for an Enter key press.

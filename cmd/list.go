@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
 	"path"
 
 	"github.com/mdeous/grsync/api"
+	"github.com/mdeous/grsync/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -20,29 +19,27 @@ var listCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			fmt.Printf("[!] Failed to establish camera session: %v\n", err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to establish camera session")
 		}
 
 		waitForWifiConnection()
 
-		fmt.Println("[+] Fetching photo list...")
+		logger.Info("Fetching photo list...")
 		photos, err := api.GetPhotos()
 		if err != nil {
-			fmt.Printf("[!] Failed to list photos on camera: %v\n", err)
-			os.Exit(1)
+			logger.Fatal(err, "Failed to list photos on camera")
 		}
 
 		if len(photos.Dirs) == 0 {
-			fmt.Println("[-] No photos found on the camera.")
+			logger.Detail("No photos found on the camera.")
 			return
 		}
 
-		fmt.Println("[-] Photos on camera:")
+		logger.Detail("Photos on camera:")
 		for _, dir := range photos.Dirs {
 			for _, filename := range dir.Files {
 				photoPath := path.Join(dir.Name, filename)
-				fmt.Printf("  - /%s\n", photoPath)
+				logger.SubDetail(1, "- /%s", photoPath)
 			}
 		}
 	},

@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
+	"github.com/mdeous/grsync/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -26,10 +24,8 @@ func init() {
 	rootCmd.MarkPersistentFlagRequired("camera")
 }
 
-// Execute executes the root command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		logger.Fatal(err, "Failed to execute command")
 	}
 }
