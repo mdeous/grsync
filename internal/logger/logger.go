@@ -6,87 +6,68 @@ import (
 	"strings"
 )
 
-// Logger provides methods for structured logging.
-type Logger struct {
-	indentationLevel int
-	indentString     string
-}
+const indentUnit = "  "
 
-// New creates a new Logger instance.
-func New() *Logger {
-	return &Logger{indentString: "  "}
-}
-
-// Indent increases the logging indentation level by one.
-func (l *Logger) Indent() {
-	l.indentationLevel++
-}
-
-// Unindent decreases the logging indentation level by one, if possible.
-func (l *Logger) Unindent() {
-	l.indentationLevel = max(l.indentationLevel-1, 0)
-}
-
-// log is the core logging function.
+// log is the core unexported logging function.
 // prefix: The log prefix (e.g., "[+]", "[-]").
-// relativeIndent: 0 for standard logs, 1 for sub-logs.
+// indentLevel: The absolute number of indent units.
 // format, args: The message format and arguments.
-func (l *Logger) log(prefix string, relativeIndent int, format string, args ...any) {
-	indentLevel := max(l.indentationLevel+relativeIndent, 0)
-	indentation := strings.Repeat(l.indentString, indentLevel)
+func log(prefix string, indentLevel int, format string, args ...any) {
+	actualIndentLevel := max(indentLevel, 0) // Ensure indentLevel is not negative
+	indentation := strings.Repeat(indentUnit, actualIndentLevel)
 	message := fmt.Sprintf(format, args...)
 	fmt.Printf("%s %s%s\n", prefix, indentation, message)
 }
 
 // Info logs an informational message.
-func (l *Logger) Info(format string, args ...any) {
-	l.log("[+]", 0, format, args...)
+func Info(format string, args ...any) {
+	log("[+]", 0, format, args...)
 }
 
-// SubInfo logs an informational message, indented by the specified level deeper than current.
-func (l *Logger) SubInfo(level int, format string, args ...any) {
-	l.log("[+]", level, format, args...)
+// SubInfo logs an informational message, indented by the specified level.
+func SubInfo(level int, format string, args ...any) {
+	log("[+]", level, format, args...)
 }
 
 // Detail logs a detail/sub-step message.
-func (l *Logger) Detail(format string, args ...any) {
-	l.log("[-]", 0, format, args...)
+func Detail(format string, args ...any) {
+	log("[-]", 0, format, args...)
 }
 
-// SubDetail logs a detail/sub-step message, indented by the specified level deeper than current.
-func (l *Logger) SubDetail(level int, format string, args ...any) {
-	l.log("[-]", level, format, args...)
+// SubDetail logs a detail/sub-step message, indented by the specified level.
+func SubDetail(level int, format string, args ...any) {
+	log("[-]", level, format, args...)
 }
 
 // Warn logs a warning message.
-func (l *Logger) Warn(format string, args ...any) {
-	l.log("[!]", 0, format, args...)
+func Warn(format string, args ...any) {
+	log("[!]", 0, format, args...)
 }
 
-// SubWarn logs a warning message, indented by the specified level deeper than current.
-func (l *Logger) SubWarn(level int, format string, args ...any) {
-	l.log("[!]", level, format, args...)
+// SubWarn logs a warning message, indented by the specified level.
+func SubWarn(level int, format string, args ...any) {
+	log("[!]", level, format, args...)
 }
 
 // Error logs an error message.
 // It does not exit the program; exiting should be handled by the caller if necessary.
-func (l *Logger) Error(err error, format string, args ...any) {
+func Error(err error, format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
 	if err != nil {
-		l.log("[!]", 0, "%s: %v", message, err)
+		log("[!]", 0, "%s: %v", message, err)
 	} else {
-		l.log("[!]", 0, "%s", message)
+		log("[!]", 0, "%s", message)
 	}
 }
 
 // Fatal logs an error message and then exits the program.
-func (l *Logger) Fatal(err error, format string, args ...any) {
-	l.Error(err, format, args...)
+func Fatal(err error, format string, args ...any) {
+	Error(err, format, args...)
 	os.Exit(1)
 }
 
 // Fatalf logs a formatted message and then exits the program.
-func (l *Logger) Fatalf(format string, args ...any) {
-	l.log("[!]", 0, format, args...)
+func Fatalf(format string, args ...any) {
+	log("[!]", 0, format, args...)
 	os.Exit(1)
 }
