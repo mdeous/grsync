@@ -68,7 +68,7 @@ func DownloadPhoto(photoPath string, destDir string) (destPath string, err error
 		}
 	}
 
-	photoUri := photosPath + "/" + photoPath
+	photoUri := path.Join(photosPath, photoPath)
 	photoData, err := readURI(photoUri)
 	if err != nil {
 		return "", fmt.Errorf("failed to download photo %s: %w", photoPath, err)
