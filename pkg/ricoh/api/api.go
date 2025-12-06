@@ -9,14 +9,19 @@ import (
 	"path"
 )
 
-const (
-	host           = "http://192.168.0.1"
+var (
+	baseURL        = "http://192.168.0.1"
 	propertiesPath = "/v1/props"
 	photosPath     = "/v1/photos"
 )
 
+// SetBaseURL overrides the base URL for testing purposes
+func SetBaseURL(url string) {
+	baseURL = url
+}
+
 func readURI(uri string) ([]byte, error) {
-	resp, err := http.Get(host + uri)
+	resp, err := http.Get(baseURL + uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to camera API: %w", err)
 	}
