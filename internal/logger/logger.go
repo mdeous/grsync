@@ -50,9 +50,6 @@ var (
 			Foreground(lipgloss.Color("196")). // Bright red
 			Bold(true)
 
-	dimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")) // Dimmed gray
-
 	// Highlight styles for emphasizing specific values
 	highlightStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("51")). // Bright cyan
@@ -147,7 +144,7 @@ func Fatalf(format string, args ...any) {
 func NewSpinner(message string) *spinner.Spinner {
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	s.Suffix = " " + message
-	s.Color("cyan", "bold")
+	_ = s.Color("cyan", "bold")
 	return s
 }
 

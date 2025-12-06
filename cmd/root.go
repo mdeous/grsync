@@ -13,7 +13,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is given, print help
 		if len(args) == 0 {
-			cmd.Help()
+			_ = cmd.Help()
 			return
 		}
 	},

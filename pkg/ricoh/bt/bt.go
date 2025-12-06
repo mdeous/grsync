@@ -80,7 +80,7 @@ func (c *Client) Scan(ctx context.Context, prefix string) ([]ScanResult, error) 
 	// Start a goroutine to stop the scan when the context is done
 	go func() {
 		<-ctx.Done()
-		c.adapter.StopScan()
+		_ = c.adapter.StopScan()
 	}()
 
 	err := c.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
@@ -129,16 +129,16 @@ func (c *Client) FindCamera(name string, timeout time.Duration) (Device, error) 
 		case <-found:
 			// Camera found, scan already stopped
 		case <-ctx.Done():
-			c.adapter.StopScan()
+			_ = c.adapter.StopScan()
 		}
 	}()
 
 	// Capture the closure variables properly
 	err := c.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
 		if device.LocalName() == name {
-			if device.AdvertisementPayload.HasServiceUUID(wlanServiceUUID) {
+			if device.HasServiceUUID(wlanServiceUUID) {
 				cameraAddress = device.Address
-				c.adapter.StopScan() // Use outer adapter reference
+				_ = c.adapter.StopScan() // Use outer adapter reference
 				close(found)
 			}
 		}

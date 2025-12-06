@@ -37,7 +37,7 @@ func TestGetDeviceInfo(t *testing.T) {
 				Battery:         85,
 				SerialNumber:    "ABC123",
 			}
-			json.NewEncoder(w).Encode(props)
+			_ = json.NewEncoder(w).Encode(props)
 		}))
 		defer server.Close()
 
@@ -83,7 +83,7 @@ func TestGetDeviceInfo(t *testing.T) {
 
 	t.Run("MalformedJSON", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("invalid json"))
+			_, _ = w.Write([]byte("invalid json"))
 		}))
 		defer server.Close()
 
@@ -128,7 +128,7 @@ func TestGetPhotos(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(photos)
+			_ = json.NewEncoder(w).Encode(photos)
 		}))
 		defer server.Close()
 
@@ -154,7 +154,7 @@ func TestGetPhotos(t *testing.T) {
 	t.Run("EmptyList", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			photos := Photos{Dirs: []PhotosDir{}}
-			json.NewEncoder(w).Encode(photos)
+			_ = json.NewEncoder(w).Encode(photos)
 		}))
 		defer server.Close()
 
@@ -188,7 +188,7 @@ func TestGetPhotos(t *testing.T) {
 
 	t.Run("MalformedJSON", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("{bad json"))
+			_, _ = w.Write([]byte("{bad json"))
 		}))
 		defer server.Close()
 
@@ -213,7 +213,7 @@ func TestDownloadPhoto(t *testing.T) {
 			if r.URL.Path != expectedPath {
 				t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
 			}
-			w.Write([]byte("fake photo data"))
+			_, _ = w.Write([]byte("fake photo data"))
 		}))
 		defer server.Close()
 
@@ -247,10 +247,10 @@ func TestDownloadPhoto(t *testing.T) {
 
 		// Create the file first
 		testFile := filepath.Join(tempDir, "test.jpg")
-		os.WriteFile(testFile, []byte("existing"), 0644)
+		_ = os.WriteFile(testFile, []byte("existing"), 0644)
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("new data"))
+			_, _ = w.Write([]byte("new data"))
 		}))
 		defer server.Close()
 
@@ -271,7 +271,7 @@ func TestDownloadPhoto(t *testing.T) {
 		tempDir := t.TempDir()
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("photo data"))
+			_, _ = w.Write([]byte("photo data"))
 		}))
 		defer server.Close()
 
@@ -309,7 +309,7 @@ func TestDownloadPhoto(t *testing.T) {
 
 	t.Run("InvalidDestination", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("data"))
+			_, _ = w.Write([]byte("data"))
 		}))
 		defer server.Close()
 

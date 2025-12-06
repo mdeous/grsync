@@ -73,7 +73,7 @@ var syncCmd = &cobra.Command{
 		extensions := parseExtensions(photoExtensions)
 		if len(extensions) == 0 {
 			logger.Error(nil, "No valid photo extensions provided. Use 'jpg', 'dng', or 'all'.")
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(1)
 		}
 
@@ -171,7 +171,7 @@ var syncCmd = &cobra.Command{
 				} else {
 					downloadCount++
 				}
-				bar.Add(1)
+				_ = bar.Add(1)
 			}
 		}
 
@@ -197,5 +197,5 @@ func init() {
 	syncCmd.Flags().StringVarP(&photosDestDir, "dest", "d", ".", "Destination directory for photos")
 	syncCmd.Flags().StringVarP(&photoExtensions, "extensions", "e", "all", "Comma-separated list of photo extensions to download (jpg, dng, all)")
 	syncCmd.Flags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to")
-	syncCmd.MarkFlagRequired("camera")
+	_ = syncCmd.MarkFlagRequired("camera")
 }
