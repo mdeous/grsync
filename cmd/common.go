@@ -4,31 +4,33 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mdeous/grsync/bt"
 	"github.com/mdeous/grsync/internal/logger"
-	"tinygo.org/x/bluetooth"
 )
 
 // establishCameraSession handles the initial Bluetooth connection and Wi-Fi enabling for the camera.
 // It returns the connected Bluetooth device or an error if any step fails.
-func establishCameraSession(cameraNameVal string) (camera *bluetooth.Device, err error) {
+func establishCameraSession(cameraNameVal string) (camera bt.Device, err error) {
+	btClient := bt.NewClient()
+
 	// Enable Bluetooth adapter
-	err = bt.Adapter.Enable()
+	err = btClient.Enable()
 	if err != nil {
 		return nil, fmt.Errorf("failed to enable Bluetooth device: %w", err)
 	}
 
 	// Find Ricoh camera and connect
 	logger.Info("Scanning for Ricoh camera %s...", cameraNameVal)
-	camera, err = bt.FindCamera(cameraNameVal)
+	camera, err = btClient.FindCamera(cameraNameVal, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find camera %s: %w", cameraNameVal, err)
 	}
-	logger.SubDetail(1, "Connected to camera %s at address %s", cameraNameVal, camera.Address.String())
+	logger.SubDetail(1, "Connected to camera %s at address %s", cameraNameVal, camera.Address().String())
 
 	// Enable camera Wi-Fi hotspot
-	ssid, passphrase, err := bt.EnableWifi(camera)
+	ssid, passphrase, err := btClient.EnableWifi(camera)
 	if err != nil {
 		return camera, fmt.Errorf("failed to enable Wi-Fi: %w", err)
 	}
@@ -39,7 +41,7 @@ func establishCameraSession(cameraNameVal string) (camera *bluetooth.Device, err
 }
 
 // cameraDisconnect handles the disconnection from the camera and prints relevant messages.
-func cameraDisconnect(camera *bluetooth.Device) {
+func cameraDisconnect(camera bt.Device) {
 	if camera == nil {
 		return
 	}

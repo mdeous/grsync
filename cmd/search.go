@@ -1,0 +1,46 @@
+package cmd
+
+import (
+	"context"
+	"time"
+
+	"github.com/mdeous/grsync/bt"
+	"github.com/mdeous/grsync/internal/logger"
+	"github.com/spf13/cobra"
+)
+
+var searchCmd = &cobra.Command{
+	Use:   "search",
+	Short: "Scan for available Ricoh GR cameras",
+	Run: func(cmd *cobra.Command, args []string) {
+		client := bt.NewClient()
+
+		if err := client.Enable(); err != nil {
+			logger.Fatal(err, "Failed to enable Bluetooth adapter")
+		}
+
+		logger.Info("Scanning for available Ricoh cameras...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		results, err := client.Scan(ctx, "GR_")
+		if err != nil {
+			logger.Fatal(err, "Scan failed")
+		}
+
+		if len(results) == 0 {
+			logger.Info("No cameras found.")
+			return
+		}
+
+		logger.Info("Found %d camera(s):", len(results))
+		for _, res := range results {
+			logger.SubInfo(1, "%s (RSSI: %d)", res.Name, res.RSSI)
+		}
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(searchCmd)
+}

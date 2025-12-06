@@ -20,8 +20,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to")
-	rootCmd.MarkPersistentFlagRequired("camera")
 }
 
 func Execute() {

@@ -147,4 +147,6 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().StringVarP(&photosDestDir, "dest", "d", ".", "Destination directory for photos")
 	syncCmd.Flags().StringVarP(&photoExtensions, "extensions", "e", "all", "Comma-separated list of photo extensions to download (jpg, dng, all)")
+	syncCmd.Flags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to")
+	syncCmd.MarkFlagRequired("camera")
 }

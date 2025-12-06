@@ -1,7 +1,9 @@
 package bt
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mdeous/grsync/internal/logger"
@@ -9,9 +11,9 @@ import (
 )
 
 const (
-	scanMaxTime     = 30 * time.Second
-	wifiStartupTime = 2 * time.Second
-	rxBuffSize      = 64
+	defaultScanTimeout = 30 * time.Second
+	wifiStartupTime    = 2 * time.Second
+	rxBuffSize         = 64
 )
 
 type WifiState int
@@ -22,7 +24,6 @@ const (
 	WifiUnknown
 )
 
-// String returns a string representation of the WifiState.
 func (s WifiState) String() string {
 	switch s {
 	case WifiDisabled:
@@ -34,14 +35,7 @@ func (s WifiState) String() string {
 	}
 }
 
-var (
-	Adapter       = bluetooth.DefaultAdapter
-	CameraAddress bluetooth.Address
-	cameraFound   = false
-	scanDone      = make(chan struct{})
-)
-
-// Bluetooth UUIDs for WLAN service
+// Bluetooth UUIDs
 var (
 	wlanServiceUUID, _        = bluetooth.ParseUUID("F37F568F-9071-445D-A938-5441F2E82399")
 	wlanNetworkCharUUID, _    = bluetooth.ParseUUID("9111CDD0-9F01-45C4-A2D4-E09E8FB0424D")
@@ -49,37 +43,133 @@ var (
 	wlanPassphraseCharUUID, _ = bluetooth.ParseUUID("0F38279C-FE9E-461B-8596-81287E8C9A81")
 )
 
-func stopScan(cameraFound bool) {
-	close(scanDone)
-	if !cameraFound {
-		logger.Warn("Bluetooth scan timed out after %s, stopping scan", scanMaxTime)
-	}
-	if err := Adapter.StopScan(); err != nil {
-		logger.Warn("Failed to stop Bluetooth scan: %v", err)
-	}
-	logger.SubDetail(1, "Stopped scanning")
+type Client struct {
+	adapter Adapter
 }
 
-func scanCallback(deviceName string) func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
-	return func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
-		// We already found the camera, do nothing with new advertisements
-		if cameraFound {
+func NewClient() *Client {
+	return &Client{
+		adapter: &RealAdapter{adapter: bluetooth.DefaultAdapter},
+	}
+}
+
+// For testing purposes
+func NewClientWithAdapter(a Adapter) *Client {
+	return &Client{
+		adapter: a,
+	}
+}
+
+func (c *Client) Enable() error {
+	return c.adapter.Enable()
+}
+
+type ScanResult struct {
+	Name    string
+	Address bluetooth.Address
+	RSSI    int16
+}
+
+func (c *Client) Scan(ctx context.Context, prefix string) ([]ScanResult, error) {
+	var results []ScanResult
+	seen := make(map[string]bool)
+
+	// The callback is called from the adapter scan loop.
+	// For RealAdapter, it calls tinygo Scan.
+
+	// Start a goroutine to stop the scan when the context is done
+	go func() {
+		<-ctx.Done()
+		c.adapter.StopScan()
+	}()
+
+	err := c.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
+		name := device.LocalName()
+		addr := device.Address.String()
+
+		if seen[addr] {
 			return
 		}
-		// Check if the device is our camera
-		devAddr := device.Address.String()
-		if device.AdvertisementPayload.HasServiceUUID(wlanServiceUUID) && device.LocalName() == deviceName {
-			cameraFound = true
-			logger.Detail("Found Ricoh camera %s with address %s (RSSI: %d)", deviceName, devAddr, device.RSSI)
-			CameraAddress = device.Address
-			// Camera found, no need to continue scanning
-			stopScan(true)
+
+		if prefix != "" && !strings.HasPrefix(name, prefix) {
+			return
 		}
+
+		logger.SubDetail(1, "Discovered: %s (%s) RSSI: %d", name, addr, device.RSSI)
+
+		results = append(results, ScanResult{
+			Name:    name,
+			Address: device.Address,
+			RSSI:    device.RSSI,
+		})
+		seen[addr] = true
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to start scan: %w", err)
 	}
+
+	return results, nil
 }
 
-func getService(device *bluetooth.Device, svcUUID bluetooth.UUID) (*bluetooth.DeviceService, error) {
-	// Discover the requested service
+func (c *Client) FindCamera(name string, timeout time.Duration) (Device, error) {
+	if timeout == 0 {
+		timeout = defaultScanTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var cameraAddress bluetooth.Address
+	found := make(chan struct{})
+
+	logger.Info("Scanning for camera: %s...", name)
+
+	// Start a goroutine to stop the scan when the context is done or camera is found
+	go func() {
+		select {
+		case <-found:
+			// Camera found, scan already stopped
+		case <-ctx.Done():
+			c.adapter.StopScan()
+		}
+	}()
+
+	// Capture the closure variables properly
+	err := c.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
+		if device.LocalName() == name {
+			if device.AdvertisementPayload.HasServiceUUID(wlanServiceUUID) {
+				cameraAddress = device.Address
+				c.adapter.StopScan() // Use outer adapter reference
+				close(found)
+			}
+		}
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start scan: %w", err)
+	}
+
+	select {
+	case <-found:
+	case <-ctx.Done():
+		return nil, fmt.Errorf("camera %s not found within timeout", name)
+	}
+
+	logger.Info("Found camera %s, connecting...", name)
+
+	device, err := c.adapter.Connect(cameraAddress, bluetooth.ConnectionParams{})
+	if err != nil {
+		// Retry
+		device, err = c.adapter.Connect(cameraAddress, bluetooth.ConnectionParams{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to camera %s: %w", name, err)
+		}
+	}
+
+	return device, nil
+}
+
+func getService(device Device, svcUUID bluetooth.UUID) (Service, error) {
 	services, err := device.DiscoverServices([]bluetooth.UUID{svcUUID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover %s service: %w", svcUUID.String(), err)
@@ -87,104 +177,60 @@ func getService(device *bluetooth.Device, svcUUID bluetooth.UUID) (*bluetooth.De
 	if len(services) != 1 {
 		return nil, fmt.Errorf("unexpected number of services found: %d", len(services))
 	}
-	svc := services[0]
-	return &svc, nil
+	return services[0], nil
 }
 
-func readCharacteristic(svc *bluetooth.DeviceService, charUUID bluetooth.UUID) (*bluetooth.DeviceCharacteristic, []byte, error) {
-	// Discover the requested characteristic
-	characteristic, err := svc.DiscoverCharacteristics([]bluetooth.UUID{charUUID})
+func readCharacteristic(svc Service, charUUID bluetooth.UUID) (Characteristic, []byte, error) {
+	characteristics, err := svc.DiscoverCharacteristics([]bluetooth.UUID{charUUID})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to discover %s characteristic: %w", charUUID.String(), err)
 	}
-	if len(characteristic) != 1 {
-		return nil, nil, fmt.Errorf("unexpected number of characteristics found: %d", len(characteristic))
+	if len(characteristics) != 1 {
+		return nil, nil, fmt.Errorf("unexpected number of characteristics found: %d", len(characteristics))
 	}
-	chr := characteristic[0]
+	chr := characteristics[0]
 
-	// Read the characteristic value
 	buffer := make([]byte, rxBuffSize)
 	dataLen, err := chr.Read(buffer)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read characteristic %s data: %w", charUUID.String(), err)
 	}
 
-	// Return the relevant portion of the buffer
-	return &chr, buffer[:dataLen], nil
+	return chr, buffer[:dataLen], nil
 }
 
-func getWifiStatus(svc *bluetooth.DeviceService) (*bluetooth.DeviceCharacteristic, WifiState, error) {
+func getWifiStatus(svc Service) (Characteristic, WifiState, error) {
 	chr, statusBytes, err := readCharacteristic(svc, wlanNetworkCharUUID)
 	if err != nil {
 		return nil, WifiUnknown, err
 	}
-	statusLen := len(statusBytes)
-	if statusLen != 1 {
-		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", statusLen)
+	if len(statusBytes) != 1 {
+		return nil, WifiUnknown, fmt.Errorf("unexpected Wi-Fi status length: %d", len(statusBytes))
 	}
-	statusValue := WifiState(statusBytes[0])
-	logger.Info("Wi-Fi hotspot status: %s", statusValue)
-	return chr, statusValue, nil
+	status := WifiState(statusBytes[0])
+	logger.Info("Wi-Fi hotspot status: %s", status)
+	return chr, status, nil
 }
 
-func FindCamera(name string) (*bluetooth.Device, error) {
-	// Scan timeout handler
-	go func() {
-		for {
-			select {
-			case <-time.After(scanMaxTime):
-				stopScan(false)
-				return
-			case <-scanDone:
-				return
-			}
-		}
-	}()
-	// Start scanning for devices
-	cb := scanCallback(name)
-	if err := Adapter.Scan(cb); err != nil {
-		return nil, fmt.Errorf("failed to start Bluetooth scan: %w", err)
-	}
-	// Wait for scan to finish
-	<-scanDone
-	if !cameraFound {
-		return nil, fmt.Errorf("%s not found", name)
-	}
-	// Connect to the camera
-	logger.Info("Connecting to camera...")
-	cameraDevice, err := Adapter.Connect(CameraAddress, bluetooth.ConnectionParams{})
-	if err != nil {
-		// NOTE: for some reason the 1st connection sometimes fails and requires a retry
-		cameraDevice, err = Adapter.Connect(CameraAddress, bluetooth.ConnectionParams{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to camera %s: %w", name, err)
-		}
-	}
-	return &cameraDevice, nil
-}
-
-func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err error) {
-	// Discover the WLAN service
+func (c *Client) EnableWifi(device Device) (string, string, error) {
 	svc, err := getService(device, wlanServiceUUID)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Get Wi-Fi hotspot status
-	chr, wlanStatusValue, err := getWifiStatus(svc)
+	chr, status, err := getWifiStatus(svc)
 	if err != nil {
 		return "", "", err
 	}
-	if wlanStatusValue == WifiDisabled {
+
+	if status == WifiDisabled {
 		logger.Info("Enabling Wi-Fi hotspot...")
-		// Enable Wi-Fi hotspot
-		statusBytes := []byte{byte(WifiEnabled)}
-		_, err = chr.WriteWithoutResponse(statusBytes)
-		if err != nil {
+		if _, err := chr.WriteWithoutResponse([]byte{byte(WifiEnabled)}); err != nil {
 			return "", "", fmt.Errorf("failed to write Wi-Fi status: %w", err)
 		}
+
 		time.Sleep(wifiStartupTime)
-		// Check if Wi-Fi was successfully enabled
+
 		_, newStatus, err := getWifiStatus(svc)
 		if err != nil {
 			return "", "", err
@@ -194,19 +240,15 @@ func EnableWifi(device *bluetooth.Device) (ssid string, passphrase string, err e
 		}
 	}
 
-	// Get Wi-Fi SSID
 	_, ssidBytes, err := readCharacteristic(svc, wlanSSIDCharUUID)
 	if err != nil {
 		return "", "", err
 	}
-	ssid = string(ssidBytes)
 
-	// Get Wi-Fi passphrase
-	_, passphraseBytes, err := readCharacteristic(svc, wlanPassphraseCharUUID)
+	_, passBytes, err := readCharacteristic(svc, wlanPassphraseCharUUID)
 	if err != nil {
 		return "", "", err
 	}
-	passphrase = string(passphraseBytes)
 
-	return
+	return string(ssidBytes), string(passBytes), nil
 }

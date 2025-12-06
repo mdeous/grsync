@@ -47,5 +47,6 @@ var listCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(listCmd)
+	listCmd.Flags().StringVarP(&cameraName, "camera", "c", "", "Name of the Ricoh camera to connect to")
 	listCmd.MarkFlagRequired("camera")
 }
