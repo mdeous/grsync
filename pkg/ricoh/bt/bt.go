@@ -95,8 +95,6 @@ func (c *Client) Scan(ctx context.Context, prefix string) ([]ScanResult, error) 
 			return
 		}
 
-		logger.SubDetail(1, "Discovered: %s (%s) RSSI: %d", name, addr, device.RSSI)
-
 		results = append(results, ScanResult{
 			Name:    name,
 			Address: device.Address,

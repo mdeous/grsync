@@ -22,12 +22,13 @@ func establishCameraSession(cameraNameVal string) (camera bt.Device, err error) 
 	}
 
 	// Find Ricoh camera and connect
-	logger.Info("Scanning for Ricoh camera %s...", cameraNameVal)
+	scanSpinner := logger.StartSpinner(fmt.Sprintf("Scanning for Ricoh camera %s...", logger.Highlight(cameraNameVal)))
 	camera, err = btClient.FindCamera(cameraNameVal, 10*time.Second)
+	scanSpinner.Stop()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find camera %s: %w", cameraNameVal, err)
 	}
-	logger.SubDetail(1, "Connected to camera %s at address %s", cameraNameVal, camera.Address().String())
+	logger.Success("Connected to camera %s at address %s", logger.Highlight(cameraNameVal), logger.Accent(camera.Address().String()))
 
 	// Enable camera Wi-Fi hotspot
 	ssid, passphrase, err := btClient.EnableWifi(camera)
@@ -35,8 +36,8 @@ func establishCameraSession(cameraNameVal string) (camera bt.Device, err error) 
 		return camera, fmt.Errorf("failed to enable Wi-Fi: %w", err)
 	}
 	logger.Info("Wi-Fi hotspot information:")
-	logger.SubDetail(1, "SSID: %s", ssid)
-	logger.SubDetail(1, "Passphrase: %s", passphrase)
+	logger.SubDetail(1, "SSID: %s", logger.Highlight(ssid))
+	logger.SubDetail(1, "Passphrase: %s", logger.Accent(passphrase))
 	return camera, nil
 }
 
@@ -49,14 +50,17 @@ func cameraDisconnect(camera bt.Device) {
 	if err := camera.Disconnect(); err != nil {
 		logger.Warn("Failed to disconnect from camera: %v", err)
 	} else {
-		logger.SubDetail(1, "Bluetooth connection closed")
+		logger.Detail("Bluetooth connection closed")
 	}
-	logger.Info("All done, you can now disconnect from the camera's Wi-Fi hotspot.")
+	logger.Success("All done, you can now disconnect from the camera's Wi-Fi hotspot.")
 }
 
 // waitForWifiConnection prompts the user to connect to the Wi-Fi and waits for an Enter key press.
 func waitForWifiConnection() {
-	fmt.Printf("%s[>] Press Enter to continue after connecting to the Wi-Fi hotspot...%s", logger.ColorBoldCyan, logger.ColorReset)
+	promptStyle := "\033[1;36m" // Cyan bold
+	resetStyle := "\033[0m"
+	fmt.Printf("\n%s⏎ Press Enter to continue after connecting to the Wi-Fi hotspot...%s ", promptStyle, resetStyle)
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
+	fmt.Println()
 }

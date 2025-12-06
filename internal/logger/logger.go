@@ -4,71 +4,129 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/briandowns/spinner"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
 	indentUnit = "  "
 )
 
+// Unicode icons for modern terminal output
+const (
+	IconSuccess = "✓"
+	IconDetail  = "→"
+	IconWarning = "⚠"
+	IconError   = "✗"
+	IconInfo    = "◉"
+)
+
+// Legacy color constants (kept for compatibility with waitForWifiConnection)
 const (
 	ColorReset    = "\033[0m"
-	ColorBlue     = "\033[34m"
-	ColorBoldBlue = "\033[1;34m"
-	ColorRed      = "\033[31m"
-	ColorBoldRed  = "\033[1;31m"
 	ColorBoldCyan = "\033[1;36m"
 )
 
-// log is the core unexported logging function.
-// prefix: The log prefix (e.g., "[+]", "[-]").
-// indentLevel: The absolute number of indent units.
-// colorCode: ANSI color code to apply to the output.
-// format, args: The message format and arguments.
-func log(prefix string, indentLevel int, colorCode string, format string, args ...any) {
-	actualIndentLevel := max(indentLevel, 0) // Ensure indentLevel is not negative
+// Modern styles using lipgloss
+var (
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")). // Bright green
+			Bold(true)
+
+	infoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")). // Bright blue
+			Bold(true)
+
+	detailStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")) // Gray
+
+	warnStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")). // Orange
+			Bold(true)
+
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")). // Bright red
+			Bold(true)
+
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")) // Dimmed gray
+
+	// Highlight styles for emphasizing specific values
+	highlightStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("51")). // Bright cyan
+			Bold(true)
+
+	accentStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("141")) // Purple/magenta
+
+	pathStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("228")) // Yellow
+
+	numberStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("213")). // Pink/magenta
+			Bold(true)
+)
+
+// log is the core unexported logging function with modern styling.
+func log(icon string, style lipgloss.Style, indentLevel int, format string, args ...any) {
+	actualIndentLevel := max(indentLevel, 0)
 	indentation := strings.Repeat(indentUnit, actualIndentLevel)
 	message := fmt.Sprintf(format, args...)
-	fmt.Printf("%s%s %s%s%s\n", colorCode, prefix, indentation, message, ColorReset)
+
+	styledIcon := style.Render(icon)
+	fmt.Printf("%s %s%s\n", styledIcon, indentation, message)
 }
 
-// Info logs an informational message.
+// Info logs an informational message with a bright icon.
 func Info(format string, args ...any) {
-	log("[+]", 0, ColorBoldBlue, format, args...)
+	log(IconInfo, infoStyle, 0, format, args...)
 }
 
 // SubInfo logs an informational message, indented by the specified level.
 func SubInfo(level int, format string, args ...any) {
-	log("[+]", level, ColorBoldBlue, format, args...)
+	log(IconInfo, infoStyle, level, format, args...)
 }
 
-// Detail logs a detail/sub-step message.
+// Detail logs a detail/sub-step message with dimmed styling.
 func Detail(format string, args ...any) {
-	log("[-]", 0, ColorBlue, format, args...)
+	log(IconDetail, detailStyle, 0, format, args...)
 }
 
 // SubDetail logs a detail/sub-step message, indented by the specified level.
 func SubDetail(level int, format string, args ...any) {
-	log("[-]", level, ColorBlue, format, args...)
+	log(IconDetail, detailStyle, level, format, args...)
 }
 
-// Warn logs a warning message.
+// Success logs a success message with a checkmark icon.
+func Success(format string, args ...any) {
+	log(IconSuccess, successStyle, 0, format, args...)
+}
+
+// SubSuccess logs a success message, indented by the specified level.
+func SubSuccess(level int, format string, args ...any) {
+	log(IconSuccess, successStyle, level, format, args...)
+}
+
+// Warn logs a warning message with a warning icon.
 func Warn(format string, args ...any) {
-	log("[!]", 0, ColorRed, format, args...)
+	log(IconWarning, warnStyle, 0, format, args...)
 }
 
 // SubWarn logs a warning message, indented by the specified level.
 func SubWarn(level int, format string, args ...any) {
-	log("[!]", level, ColorRed, format, args...)
+	log(IconWarning, warnStyle, level, format, args...)
 }
 
-// Error logs an error message.
+// Error logs an error message with an X icon.
 // It does not exit the program; exiting should be handled by the caller if necessary.
 func Error(err error, format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
 	if err != nil {
-		log("[!]", 0, ColorBoldRed, "%s: %v", message, err)
+		log(IconError, errorStyle, 0, "%s: %v", message, err)
 	} else {
-		log("[!]", 0, ColorBoldRed, "%s", message)
+		log(IconError, errorStyle, 0, "%s", message)
 	}
 }
 
@@ -80,6 +138,53 @@ func Fatal(err error, format string, args ...any) {
 
 // Fatalf logs a formatted message and then exits the program.
 func Fatalf(format string, args ...any) {
-	log("[!]", 0, ColorBoldRed, format, args...)
+	log(IconError, errorStyle, 0, format, args...)
 	os.Exit(1)
+}
+
+// NewSpinner creates a new spinner with a custom message and modern styling.
+// The caller is responsible for starting and stopping the spinner.
+func NewSpinner(message string) *spinner.Spinner {
+	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	s.Suffix = " " + message
+	s.Color("cyan", "bold")
+	return s
+}
+
+// StartSpinner is a convenience function that creates and starts a spinner.
+func StartSpinner(message string) *spinner.Spinner {
+	s := NewSpinner(message)
+	s.Start()
+	return s
+}
+
+// StopSpinner stops a spinner and optionally prints a completion message.
+func StopSpinner(s *spinner.Spinner, successMsg string) {
+	if s == nil {
+		return
+	}
+	s.Stop()
+	if successMsg != "" {
+		Success(successMsg)
+	}
+}
+
+// Highlight returns a highlighted (bright cyan) version of the text.
+func Highlight(text string) string {
+	return highlightStyle.Render(text)
+}
+
+// Accent returns an accented (purple) version of the text.
+func Accent(text string) string {
+	return accentStyle.Render(text)
+}
+
+// Path returns a path-styled (yellow) version of the text.
+func Path(text string) string {
+	return pathStyle.Render(text)
+}
+
+// Number returns a number-styled (bold pink) version of the text.
+func Number(text string) string {
+	return numberStyle.Render(text)
 }

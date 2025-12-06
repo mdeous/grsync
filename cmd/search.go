@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/mdeous/grsync/internal/logger"
@@ -19,24 +20,25 @@ var searchCmd = &cobra.Command{
 			logger.Fatal(err, "Failed to enable Bluetooth adapter")
 		}
 
-		logger.Info("Scanning for available Ricoh cameras...")
+		scanSpinner := logger.StartSpinner("Scanning for available Ricoh cameras...")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		results, err := client.Scan(ctx, "GR_")
+		scanSpinner.Stop()
 		if err != nil {
 			logger.Fatal(err, "Scan failed")
 		}
 
 		if len(results) == 0 {
-			logger.Info("No cameras found.")
+			logger.Detail("No cameras found.")
 			return
 		}
 
-		logger.Info("Found %d camera(s):", len(results))
+		logger.Success("Found %s camera(s):", logger.Number(fmt.Sprintf("%d", len(results))))
 		for _, res := range results {
-			logger.SubInfo(1, "%s (RSSI: %d)", res.Name, res.RSSI)
+			logger.SubDetail(1, "%s (RSSI: %s)", logger.Highlight(res.Name), logger.Accent(fmt.Sprintf("%d", res.RSSI)))
 		}
 	},
 }

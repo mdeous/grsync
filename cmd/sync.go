@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/mdeous/grsync/internal/logger"
 	"github.com/mdeous/grsync/pkg/ricoh/api"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +61,7 @@ var syncCmd = &cobra.Command{
 
 		// Ensure the destination directory exists, create if not.
 		if _, err := os.Stat(photosDestDir); os.IsNotExist(err) {
-			logger.Info("Destination directory '%s' does not exist, creating it.", photosDestDir)
+			logger.Info("Destination directory %s does not exist, creating it.", logger.Path(photosDestDir))
 			if err := os.MkdirAll(photosDestDir, 0755); err != nil {
 				logger.Fatal(err, "Failed to create destination directory '%s'", photosDestDir)
 			}
@@ -87,18 +89,21 @@ var syncCmd = &cobra.Command{
 
 		waitForWifiConnection()
 
-		logger.Info("Fetching device information...")
+		infoSpinner := logger.StartSpinner("Fetching device information...")
 		props, err := api.GetDeviceInfo()
+		infoSpinner.Stop()
 		if err != nil {
 			logger.Fatal(err, "Failed to get device information")
 		}
-		logger.SubDetail(1, "Model: %s", props.Model)
-		logger.SubDetail(1, "Firmware version: %s", props.FirmwareVersion)
-		logger.SubDetail(1, "Serial number: %s", props.SerialNumber)
-		logger.SubDetail(1, "Battery level: %d%%", props.Battery)
+		logger.Success("Device information:")
+		logger.SubDetail(1, "Model: %s", logger.Highlight(props.Model))
+		logger.SubDetail(1, "Firmware version: %s", logger.Accent(props.FirmwareVersion))
+		logger.SubDetail(1, "Serial number: %s", logger.Accent(props.SerialNumber))
+		logger.SubDetail(1, "Battery level: %s%%", logger.Number(fmt.Sprintf("%d", props.Battery)))
 
-		logger.Info("Fetching photo list...")
+		listSpinner := logger.StartSpinner("Fetching photo list...")
 		photos, err := api.GetPhotos()
+		listSpinner.Stop()
 		if err != nil {
 			logger.Fatal(err, "Failed to list photos on camera")
 		}
@@ -109,8 +114,44 @@ var syncCmd = &cobra.Command{
 			return
 		}
 
+		// Count total files matching extensions
+		totalFiles := 0
+		for _, dir := range photos.Dirs {
+			for _, filename := range dir.Files {
+				fileExt := strings.ToLower(strings.TrimPrefix(filepath.Ext(filename), "."))
+				if extensions[fileExt] {
+					totalFiles++
+				}
+			}
+		}
+
+		if totalFiles == 0 {
+			logger.Detail("No matching photos found on the camera.")
+			return
+		}
+
 		downloadCount := 0
-		logger.Info("Downloading photos...")
+		skipCount := 0
+		failCount := 0
+
+		logger.Info("Downloading %s photo(s)...", logger.Number(fmt.Sprintf("%d", totalFiles)))
+
+		// Create progress bar with modern styling
+		bar := progressbar.NewOptions(totalFiles,
+			progressbar.OptionSetDescription("Downloading"),
+			progressbar.OptionSetWidth(40),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetTheme(progressbar.Theme{
+				Saucer:        "=",
+				SaucerHead:    ">",
+				SaucerPadding: " ",
+				BarStart:      "[",
+				BarEnd:        "]",
+			}),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionSetPredictTime(true),
+		)
+
 		for _, dir := range photos.Dirs {
 			for _, filename := range dir.Files {
 				photoPath := path.Join(dir.Name, filename)
@@ -120,24 +161,32 @@ var syncCmd = &cobra.Command{
 					continue
 				}
 
-				logger.SubDetail(1, "Downloading %s...", photoPath)
-				destPath, err := api.DownloadPhoto(photoPath, photosDestDir)
+				_, err := api.DownloadPhoto(photoPath, photosDestDir)
 				if err != nil {
 					if os.IsExist(err) {
-						logger.SubDetail(2, "Skipping, file already exists: %s", destPath)
+						skipCount++
 					} else {
-						logger.SubWarn(2, "Failed to download %s: %v", photoPath, err)
+						failCount++
 					}
 				} else {
-					logger.SubDetail(2, "Saved to %s", destPath)
 					downloadCount++
 				}
+				bar.Add(1)
 			}
 		}
 
+		fmt.Println() // Add newline after progress bar
+
 		if downloadCount > 0 {
-			logger.Info("Successfully downloaded %d photo(s) to %s", downloadCount, photosDestDir)
-		} else {
+			logger.Success("Downloaded %s photo(s) to %s", logger.Number(fmt.Sprintf("%d", downloadCount)), logger.Path(photosDestDir))
+		}
+		if skipCount > 0 {
+			logger.Detail("Skipped %s existing photo(s)", logger.Accent(fmt.Sprintf("%d", skipCount)))
+		}
+		if failCount > 0 {
+			logger.Warn("Failed to download %s photo(s)", logger.Number(fmt.Sprintf("%d", failCount)))
+		}
+		if downloadCount == 0 && skipCount == 0 && failCount == 0 {
 			logger.Detail("No new photos to download.")
 		}
 	},

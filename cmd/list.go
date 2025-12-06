@@ -24,8 +24,9 @@ var listCmd = &cobra.Command{
 
 		waitForWifiConnection()
 
-		logger.Info("Fetching photo list...")
+		fetchSpinner := logger.StartSpinner("Fetching photo list...")
 		photos, err := api.GetPhotos()
+		fetchSpinner.Stop()
 		if err != nil {
 			logger.Fatal(err, "Failed to list photos on camera")
 		}
@@ -35,11 +36,11 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		logger.Detail("Photos on camera:")
+		logger.Success("Photos on camera:")
 		for _, dir := range photos.Dirs {
 			for _, filename := range dir.Files {
 				photoPath := path.Join(dir.Name, filename)
-				logger.SubDetail(1, "- /%s", photoPath)
+				logger.SubDetail(1, "%s", logger.Path("/"+photoPath))
 			}
 		}
 	},
