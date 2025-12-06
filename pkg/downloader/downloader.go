@@ -1,11 +1,11 @@
-package parallel
+package downloader
 
 import (
 	"os"
 	"sync"
 
-	"github.com/mdeous/grsync/api"
 	"github.com/mdeous/grsync/internal/logger"
+	"github.com/mdeous/grsync/pkg/ricoh/api"
 )
 
 // PhotoJob represents a photo download job

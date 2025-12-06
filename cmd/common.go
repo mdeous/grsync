@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/mdeous/grsync/bt"
 	"github.com/mdeous/grsync/internal/logger"
+	"github.com/mdeous/grsync/pkg/ricoh/bt"
 )
 
 // establishCameraSession handles the initial Bluetooth connection and Wi-Fi enabling for the camera.

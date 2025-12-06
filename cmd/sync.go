@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mdeous/grsync/api"
 	"github.com/mdeous/grsync/internal/logger"
+	"github.com/mdeous/grsync/pkg/ricoh/api"
 	"github.com/spf13/cobra"
 )
 

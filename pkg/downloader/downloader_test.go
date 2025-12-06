@@ -1,4 +1,4 @@
-package parallel
+package downloader
 
 import (
 	"errors"
@@ -42,8 +42,8 @@ func TestDownloader(t *testing.T) {
 		// Start test
 		downloader.DownloadAll(jobs)
 
-// Check results
-success, skipped, failed := downloader.GetStats()
+		// Check results
+		success, skipped, failed := downloader.GetStats()
 		if success != 4 {
 			t.Errorf("Expected 4 successful downloads, got %d", success)
 		}
@@ -54,7 +54,7 @@ success, skipped, failed := downloader.GetStats()
 			t.Errorf("Expected 0 failed downloads, got %d", failed)
 		}
 	})
-	
+
 	t.Run("Handle mixed results", func(t *testing.T) {
 		// Create a test downloader with 1 worker
 		downloader := NewDownloader(1)
@@ -64,15 +64,15 @@ success, skipped, failed := downloader.GetStats()
 		// Create test jobs with one that will fail and one already exists
 		jobs := []PhotoJob{
 			{PhotoPath: "success.jpg", DestDir: "/tmp"},
-			{PhotoPath: "exists.jpg", DestDir: "/tmp"},  // Will return os.ErrExist
-			{PhotoPath: "error.jpg", DestDir: "/tmp"},   // Will return an error
+			{PhotoPath: "exists.jpg", DestDir: "/tmp"}, // Will return os.ErrExist
+			{PhotoPath: "error.jpg", DestDir: "/tmp"},  // Will return an error
 		}
 
 		// Start test
 		downloader.DownloadAll(jobs)
 
-// Check results
-success, skipped, failed := downloader.GetStats()
+		// Check results
+		success, skipped, failed := downloader.GetStats()
 		if success != 1 {
 			t.Errorf("Expected 1 successful download, got %d", success)
 		}
@@ -83,19 +83,19 @@ success, skipped, failed := downloader.GetStats()
 			t.Errorf("Expected 1 failed download, got %d", failed)
 		}
 	})
-	
+
 	t.Run("Handle empty job list", func(t *testing.T) {
-// Create a test downloader with 2 workers
-downloader := NewDownloader(2)
+		// Create a test downloader with 2 workers
+		downloader := NewDownloader(2)
 
-// Start test with empty jobs list
-downloader.DownloadAll([]PhotoJob{})
+		// Start test with empty jobs list
+		downloader.DownloadAll([]PhotoJob{})
 
-// Check results
-success, skipped, failed := downloader.GetStats()
+		// Check results
+		success, skipped, failed := downloader.GetStats()
 		if success != 0 || skipped != 0 || failed != 0 {
-			t.Errorf("Expected all zeros, got success=%d, skipped=%d, failed=%d", 
-success, skipped, failed)
+			t.Errorf("Expected all zeros, got success=%d, skipped=%d, failed=%d",
+				success, skipped, failed)
 		}
 	})
 }
@@ -106,13 +106,13 @@ func TestNewDownloader(t *testing.T) {
 	if d1.numWorkers != 5 {
 		t.Errorf("Expected 5 workers, got %d", d1.numWorkers)
 	}
-	
+
 	// Test with zero worker count (should default to 1)
 	d2 := NewDownloader(0)
 	if d2.numWorkers != 1 {
 		t.Errorf("Expected 1 worker when initialized with 0, got %d", d2.numWorkers)
 	}
-	
+
 	// Test with negative worker count (should default to 1)
 	d3 := NewDownloader(-1)
 	if d3.numWorkers != 1 {

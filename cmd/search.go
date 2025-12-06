@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/mdeous/grsync/bt"
 	"github.com/mdeous/grsync/internal/logger"
+	"github.com/mdeous/grsync/pkg/ricoh/bt"
 	"github.com/spf13/cobra"
 )
 
