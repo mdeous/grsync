@@ -23,12 +23,6 @@ const (
 	IconInfo    = "◉"
 )
 
-// Legacy color constants (kept for compatibility with waitForWifiConnection)
-const (
-	ColorReset    = "\033[0m"
-	ColorBoldCyan = "\033[1;36m"
-)
-
 // Modern styles using lipgloss
 var (
 	successStyle = lipgloss.NewStyle().
