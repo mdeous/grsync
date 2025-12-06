@@ -165,7 +165,7 @@ func StopSpinner(s *spinner.Spinner, successMsg string) {
 	}
 	s.Stop()
 	if successMsg != "" {
-		Success(successMsg)
+		Success("%s", successMsg)
 	}
 }
 
