@@ -4,7 +4,7 @@
 
 `grsync` is a cross-platform tool simplifies the process of transferring photos from your Ricoh GR camera to your computer by automating the connection to the camera and the download process
 
-Tested with a Ricoh GR IIIx only, but should work with GR II and GR III models as wel.
+Tested with a Ricoh GR IIIx only, but should work with GR II and GR III models as well.
 
 ## :information_source: How it works
 
@@ -41,7 +41,7 @@ go build
 # Download only DNG files
 ./grsync --camera="GR_XXXXXX" --ext="dng"
 
-# Download both JPG and DNG files 
+# Download both JPG and DNG files
 ./grsync --camera="GR_XXXXXX" --ext="jpg,dng"
 
 # Download all supported photo types (default behavior)
@@ -51,12 +51,12 @@ go build
 ./grsync --help
 ```
 
-> :bulb: **Tip**: The camera name usually starts with "GR_" followed by a unique identifier. Check your camera's Bluetooth settings to find the exact name.
+> :bulb: **Tip**: The camera name usually starts with "GR\_" followed by a unique identifier. Check your camera's Bluetooth settings to find the exact name.
 
 ## :construction: TODO
 
-* Find a way to automate Wi-Fi hotspot connection
-* Parallelized photos download
+- Find a way to automate Wi-Fi hotspot connection
+- Parallelized photos download
 
 ## :handshake: Contributing
 
